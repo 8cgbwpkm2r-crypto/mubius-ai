@@ -8,6 +8,7 @@
      GEMINI_API_KEY   (Secret, required)  the key from Google AI Studio
      MODEL            (optional) default: gemini-flash-lite-latest
      ALLOWED_ORIGINS  (optional) default: https://ramno07.github.io
+                      (any https://mobius….pages.dev address is always allowed)
    ========================================================= */
 
 const DEFAULT_MODEL = "gemini-flash-lite-latest";
@@ -51,7 +52,9 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
     const allowed = (env.ALLOWED_ORIGINS || DEFAULT_ORIGINS).split(",").map((s) => s.trim()).filter(Boolean);
-    const okOrigin = allowed.includes("*") || allowed.includes(origin);
+    // the site on Cloudflare Pages: mobius….pages.dev (and its preview addresses)
+    const pagesSite = /^https:\/\/([a-z0-9-]+\.)?mobius[a-z0-9-]*\.pages\.dev$/.test(origin);
+    const okOrigin = allowed.includes("*") || allowed.includes(origin) || pagesSite;
     const cors = {
       "Access-Control-Allow-Origin": okOrigin ? origin || "*" : allowed[0] || "",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
