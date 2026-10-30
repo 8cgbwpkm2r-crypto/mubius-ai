@@ -1,5 +1,7 @@
 {
   "name": "mobius-ai",
-  "main": "worker.js",
-  "compatibility_date": "2026-06-01"
+  "main": "worker 2.js",
+  "compatibility_date": "2026-06-01",
+  // keep the variables set in the Cloudflare dashboard when deploying from here
+  "keep_vars": true
 }
