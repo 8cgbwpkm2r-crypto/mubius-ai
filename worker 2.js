@@ -42,6 +42,7 @@ const LANGS = {
 const SITE_FACTS = [
   "Mobius (موبيوس) is a free reading list of physics and maths books for students.",
   "Every book sits on one of five levels inside its subject: beginner, easy, medium, hard, extreme.",
+  "The Academic section (formerly Textbooks) has, for each subject, its Books, a Lectures page of complete video courses from universities and trusted teachers (played inside the site from YouTube, each marked academic lecture or conceptual learning and placed on the same five levels), and interactive Simulations.",
   "Founder: Zhehat. Developer: RAMN. Contact: Instagram @mobius.sci.",
   "The privacy policy and terms of use are linked at the bottom of every page.",
   "Tapping a book opens a panel with 'Read online' and 'Download PDF'. Many links are still being added; until then the button says the link is coming soon.",
@@ -50,7 +51,10 @@ const SITE_FACTS = [
 
 const PAGES = {
   "/": "the home page",
-  "/textbooks": "the Textbooks page (all textbook subjects)",
+  "/academic": "the Academic page (all academic subjects, each with books, lectures and simulations)",
+  "/textbooks": "the Academic page (all academic subjects)",
+  "/lectures": "the list of all lecture courses",
+  "/simulations": "the list of all simulations",
   "/pop-science": "the Pop Science page (all pop-science subjects)",
   "/privacy": "the privacy policy",
   "/terms": "the terms of use",
@@ -227,7 +231,13 @@ function whereText(data, page) {
   const path = normPath(page);
   if (PAGES[path]) return PAGES[path];
   const s = data.index.subjects.find((x) => normPath(x.href) === path);
-  return s ? "the " + s.name + " subject page" : "";
+  if (s) return "the " + s.name + " subject page (its books)";
+  // the Academic pages of a subject: /academic/<subject>, /lectures and /simulations under it
+  const hub = data.index.subjects.find((x) => x.hub && path.startsWith(normPath(x.hub)));
+  if (hub) return "the " + hub.name + " " + (path.endsWith("/lectures") ? "lectures page" : path.endsWith("/simulations") ? "simulations page" : "subject page");
+  if (path.startsWith("/lectures/")) return "a lecture course page";
+  if (path.startsWith("/simulations/")) return "a simulation page";
+  return "";
 }
 
 function systemPrompt(data, lang, books, page) {
