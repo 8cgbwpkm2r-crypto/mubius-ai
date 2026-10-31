@@ -51,7 +51,7 @@ const SITE_FACTS = [
   "Mobius (موبيوس) is a free library of physics and maths books and lecture courses for students.",
   "Every book sits on one of five levels inside its subject: beginner, easy, medium, hard, extreme.",
   "The Academic section (formerly Textbooks) has, for each subject, its Books, a Lectures page of complete video courses from universities and trusted teachers (played inside the site from YouTube, each marked academic lecture or conceptual learning and placed on the same five levels). The site has no simulations.",
-  "Founder: Zhehat. Developer: RAMN. Contact: Instagram @mobius.sci.",
+  "Founder and designer: Zhehat. Developer: RAMN. Contact: Instagram @mobius.sci.",
   "The privacy policy and terms of use are linked at the bottom of every page.",
   "Tapping a book opens a panel with 'Read online' and 'Download PDF'. Many links are still being added; until then the button says the link is coming soon.",
   "The header has a search button (or press /), a language button (English, Arabic, Kurdish Badini) and a light/dark switch.",
