@@ -16,6 +16,12 @@
                       (for example a custom domain: https://mobius.example).
      MODEL            optional. Default: gemini-flash-lite-latest
    Binding (wrangler.jsonc): RATE_LIMITER, Cloudflare's rate limiter.
+
+   Many visitors at once: the site itself is static files on Cloudflare's network,
+   so only this assistant is shared. Each visitor may ask 10 questions a minute;
+   the first question of a conversation, asked again in the same words on the same
+   page and language, is answered from memory for 6 hours instead of calling the
+   AI again; and when the AI's free limit is used up, the page answers on its own.
    ========================================================= */
 
 const DEFAULT_SITE = "https://mobius-physics.pages.dev";
@@ -23,6 +29,8 @@ const DEFAULT_MODEL = "gemini-flash-lite-latest";
 const PER_MINUTE = 10; // questions per visitor per minute when the RATE_LIMITER binding is missing
 const MAX_BODY = 16 * 1024; // bytes
 const DATA_TTL = 10 * 60 * 1000; // how long the site's book list is kept before it is fetched again
+const ANSWER_TTL = 6 * 60 * 60 * 1000; // how long a first answer is reused for the same question
+const ANSWER_MAX = 500; // answers kept in memory (the oldest go first)
 
 // Google's terms for the free Gemini API: not offered in the EEA, Switzerland or the UK.
 // The page checks the visitor's time zone too; this is the check that can't be skipped.
@@ -40,9 +48,9 @@ const LANGS = {
 
 // what the assistant may say about the site itself
 const SITE_FACTS = [
-  "Mobius (موبيوس) is a free reading list of physics and maths books for students.",
+  "Mobius (موبيوس) is a free library of physics and maths books and lecture courses for students.",
   "Every book sits on one of five levels inside its subject: beginner, easy, medium, hard, extreme.",
-  "The Academic section (formerly Textbooks) has, for each subject, its Books, a Lectures page of complete video courses from universities and trusted teachers (played inside the site from YouTube, each marked academic lecture or conceptual learning and placed on the same five levels), and interactive Simulations.",
+  "The Academic section (formerly Textbooks) has, for each subject, its Books, a Lectures page of complete video courses from universities and trusted teachers (played inside the site from YouTube, each marked academic lecture or conceptual learning and placed on the same five levels). The site has no simulations.",
   "Founder: Zhehat. Developer: RAMN. Contact: Instagram @mobius.sci.",
   "The privacy policy and terms of use are linked at the bottom of every page.",
   "Tapping a book opens a panel with 'Read online' and 'Download PDF'. Many links are still being added; until then the button says the link is coming soon.",
@@ -51,10 +59,9 @@ const SITE_FACTS = [
 
 const PAGES = {
   "/": "the home page",
-  "/academic": "the Academic page (all academic subjects, each with books, lectures and simulations)",
+  "/academic": "the Academic page (all academic subjects, each with books and lectures)",
   "/textbooks": "the Academic page (all academic subjects)",
   "/lectures": "the list of all lecture courses",
-  "/simulations": "the list of all simulations",
   "/pop-science": "the Pop Science page (all pop-science subjects)",
   "/privacy": "the privacy policy",
   "/terms": "the terms of use",
@@ -122,6 +129,34 @@ async function limited(env, ip) {
     }
   }
   return memoryLimited(ip);
+}
+
+/* ---------- answers to first questions, kept for a while ----------
+   Only a conversation's first question (no history) is kept: later ones depend on
+   what was said before. The key is the model, language, page, books and the question
+   in lower case with its spaces tidied, so "Where do I start?" asked by many students
+   on the same page costs one call to the AI. */
+
+const answers = new Map(); // key -> [time, answer]
+
+function answerKey(model, lang, page, books, question) {
+  return [model, lang, normPath(page), books.map((b) => b.title + " — " + b.author).join("|"),
+    question.toLowerCase().replace(/\s+/g, " ").trim()].join("\n");
+}
+
+function rememberedAnswer(key) {
+  const hit = answers.get(key);
+  if (!hit) return "";
+  if (Date.now() - hit[0] > ANSWER_TTL) {
+    answers.delete(key);
+    return "";
+  }
+  return hit[1];
+}
+
+function remember(key, answer) {
+  if (answers.size >= ANSWER_MAX) answers.delete(answers.keys().next().value);
+  answers.set(key, [Date.now(), answer]);
 }
 
 /* ---------- reading the request without trusting its size ---------- */
@@ -232,11 +267,10 @@ function whereText(data, page) {
   if (PAGES[path]) return PAGES[path];
   const s = data.index.subjects.find((x) => normPath(x.href) === path);
   if (s) return "the " + s.name + " subject page (its books)";
-  // the Academic pages of a subject: /academic/<subject>, /lectures and /simulations under it
+  // the Academic pages of a subject: /academic/<subject> and /lectures under it
   const hub = data.index.subjects.find((x) => x.hub && path.startsWith(normPath(x.hub)));
-  if (hub) return "the " + hub.name + " " + (path.endsWith("/lectures") ? "lectures page" : path.endsWith("/simulations") ? "simulations page" : "subject page");
+  if (hub) return "the " + hub.name + " " + (path.endsWith("/lectures") ? "lectures page" : "subject page");
   if (path.startsWith("/lectures/")) return "a lecture course page";
-  if (path.startsWith("/simulations/")) return "a simulation page";
   return "";
 }
 
@@ -358,6 +392,10 @@ export default {
     contents.push({ role: "user", parts: [{ text: question }] });
 
     const model = env.MODEL || DEFAULT_MODEL;
+    const books = pickBooks(data, body.books);
+    const key = contents.length === 1 ? answerKey(model, lang, body.page, books, question) : "";
+    const known = key && rememberedAnswer(key);
+    if (known) return json({ answer: known }, 200, cors);
     let r;
     try {
       r = await fetch(
@@ -366,7 +404,7 @@ export default {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
           body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt(data, lang, pickBooks(data, body.books), body.page) }] },
+            system_instruction: { parts: [{ text: systemPrompt(data, lang, books, body.page) }] },
             contents,
             generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
           }),
@@ -391,6 +429,7 @@ export default {
       answer = "";
     }
     if (!answer) return json({ error: "empty answer" }, 502, cors);
+    if (key) remember(key, answer);
     return json({ answer }, 200, cors);
   },
 };

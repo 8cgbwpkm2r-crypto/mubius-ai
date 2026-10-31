@@ -3,5 +3,11 @@
   "main": "worker 2.js",
   "compatibility_date": "2026-06-01",
   // keep the variables set in the Cloudflare dashboard when deploying from here
-  "keep_vars": true
+  "keep_vars": true,
+  // Cloudflare's rate limiter (needs Wrangler 4.36 or later): at most 10 questions a minute
+  // from one visitor, counted in each Cloudflare location. Without it the Worker keeps a
+  // smaller count of its own.
+  "ratelimits": [
+    { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
+  ]
 }
