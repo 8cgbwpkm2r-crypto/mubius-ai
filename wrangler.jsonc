@@ -8,6 +8,14 @@
   // from one visitor, counted in each Cloudflare location. Without it the Worker keeps a
   // smaller count of its own.
   "ratelimits": [
-    { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
-  ]
+    { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    // star ratings: at most 20 a minute from one visitor
+    { "name": "VOTE_LIMITER", "namespace_id": "1002", "simple": { "limit": 20, "period": 60 } }
+  ],
+  // the star ratings' small database: a Durable Object with its own SQLite store
+  // (free plan), created on the first deploy; no setup in the dashboard is needed
+  "durable_objects": {
+    "bindings": [{ "name": "RATINGS", "class_name": "Ratings" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Ratings"] }]
 }
