@@ -33,6 +33,9 @@
    ========================================================= */
 
 const DEFAULT_SITE = "https://mobius-physics.pages.dev";
+// the site as one Cloudflare Worker (the "-" repository's wrangler.jsonc), before it has its own
+// domain; the domain itself goes in ALLOWED_ORIGINS (or SITE_ORIGIN) once it is bought
+const KNOWN_SITES = ["https://mobius-physics.pages.dev", "https://mobius-physics.ts7h2rbpnb.workers.dev"];
 const DEFAULT_MODEL = "gemini-flash-lite-latest";
 const PER_MINUTE = 10; // questions per visitor per minute when the RATE_LIMITER binding is missing
 const MAX_BODY = 16 * 1024; // bytes
@@ -66,6 +69,8 @@ const SITE_FACTS = [
   "The Academic section (formerly Textbooks) has, for each subject, its Books, a Lectures page of complete video courses from universities and trusted teachers (played inside the site from YouTube, each marked academic lecture or conceptual learning and placed on the same five levels). The site has no simulations.",
   "Founder and designer: Zhehat. Developer: RAMN. Contact: Instagram @mobius.sci, or the Feedback page (linked at the bottom of every page), which writes an email to zawiya.physics@gmail.com.",
   "Visitors can rate every book (in its panel) and every lecture course (on its page) from 1 to 5 stars; the average is shown to everyone.",
+  "Events (in the main menu, and 'What's new in physics' on the home page) are cards written by the Mobius team about news and coming moments in physics and space, such as missions, discoveries and eclipses; coming ones have a countdown and 'Add to calendar'.",
+  "Discussions (in the main menu) is where students ask questions about physics and maths and answer each other: anyone can read; asking, replying, liking and following topics need an account, made by signing in with Google or Apple (the 'Sign in' button in the header). People who follow a topic get a notification when someone asks a question in it, and the person who asked gets one for each reply. Books and lectures never need an account.",
   "The privacy policy and terms of use are linked at the bottom of every page.",
   "Tapping a book opens a panel with 'Read online' and 'Download PDF'. Many links are still being added; until then the button says the link is coming soon.",
   "The header has a search button (or press /), a language button (English, Arabic, Kurdish Badini) and a light/dark switch.",
@@ -77,6 +82,9 @@ const PAGES = {
   "/textbooks": "the Academic page (all academic subjects)",
   "/lectures": "the list of all lecture courses",
   "/pop-science": "the Pop Science page (all pop-science subjects)",
+  "/events": "the Events page (news and coming moments in physics and space)",
+  "/discussions": "the Discussions page (students' questions and answers)",
+  "/account": "their account page (name, followed topics, notifications)",
   "/privacy": "the privacy policy",
   "/terms": "the terms of use",
 };
@@ -104,7 +112,7 @@ function originAllowed(origin, env) {
   if (!origin) return false;
   const site = siteOf(env);
   const extra = (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim().replace(/\/+$/, "")).filter(Boolean);
-  if (origin === site || extra.includes(origin)) return true;
+  if (origin === site || extra.includes(origin) || KNOWN_SITES.includes(origin)) return true;
   const host = new URL(site).host.replace(/\./g, "\\.");
   return new RegExp("^https://[a-z0-9-]+\\." + host + "$").test(origin);
 }
